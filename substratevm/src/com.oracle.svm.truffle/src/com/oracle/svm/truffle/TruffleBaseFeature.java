@@ -80,14 +80,12 @@ import com.oracle.svm.core.annotate.Substitute;
 import com.oracle.svm.core.annotate.TargetClass;
 import com.oracle.svm.core.config.ConfigurationValues;
 import com.oracle.svm.core.configure.ResourcesRegistry;
-import com.oracle.svm.core.hub.DynamicHub;
 import com.oracle.svm.core.util.UserError;
 import com.oracle.svm.core.util.VMError;
 import com.oracle.svm.graal.hosted.GraalObjectReplacer;
 import com.oracle.svm.graal.hosted.GraalProviderObjectReplacements;
 import com.oracle.svm.graal.hosted.RuntimeGraalSetup;
 import com.oracle.svm.graal.hosted.SubstrateRuntimeGraalSetup;
-import com.oracle.svm.graal.meta.SubstrateType;
 import com.oracle.svm.hosted.FeatureImpl;
 import com.oracle.svm.hosted.FeatureImpl.BeforeAnalysisAccessImpl;
 import com.oracle.svm.hosted.FeatureImpl.DuringAnalysisAccessImpl;
@@ -95,7 +93,6 @@ import com.oracle.svm.hosted.meta.HostedMetaAccess;
 import com.oracle.svm.hosted.snippets.SubstrateGraphBuilderPlugins;
 import com.oracle.svm.truffle.api.SubstrateTruffleRuntime;
 import com.oracle.svm.util.ReflectionUtil;
-import com.oracle.truffle.api.CompilerAsserts;
 import com.oracle.truffle.api.CompilerDirectives;
 import com.oracle.truffle.api.Truffle;
 import com.oracle.truffle.api.TruffleLanguage;
@@ -321,11 +318,6 @@ public final class TruffleBaseFeature implements com.oracle.svm.core.graal.Graal
     private Object replaceNodeFieldAccessor(Class<?> invalidNodeFieldType, Object source) {
         if (source != null && source.getClass() == invalidNodeFieldType) {
             throw VMError.shouldNotReachHere("Cannot have NodeFieldData in image, they must be created lazily");
-        } else if (source instanceof NodeClass && !(source instanceof SubstrateType)) {
-            NodeClass nodeClass = (NodeClass) source;
-            NodeClass replacement = graalObjectReplacer.createType(metaAccess.lookupJavaType(nodeClass.getType()));
-            assert replacement != null;
-            return replacement;
         }
         return source;
     }
@@ -937,21 +929,6 @@ final class Target_com_oracle_truffle_object_CoreLocations_DynamicObjectFieldLoc
 final class Target_com_oracle_truffle_object_CoreLocations_DynamicLongFieldLocation {
     @Alias @RecomputeFieldValue(kind = Kind.AtomicFieldUpdaterOffset) //
     private long offset;
-}
-
-@TargetClass(className = "com.oracle.truffle.api.nodes.NodeClass", onlyWith = TruffleBaseFeature.IsEnabled.class)
-final class Target_com_oracle_truffle_api_nodes_NodeClass {
-
-    @Substitute
-    public static NodeClass get(Class<?> clazz) {
-        CompilerAsserts.neverPartOfCompilation();
-
-        NodeClass nodeClass = (NodeClass) DynamicHub.fromClass(clazz).getMetaType();
-        if (nodeClass == null) {
-            throw shouldNotReachHere("Unknown node class: " + clazz.getName());
-        }
-        return nodeClass;
-    }
 }
 
 @TargetClass(className = "com.oracle.truffle.api.nodes.Node", onlyWith = TruffleBaseFeature.IsEnabled.class)
