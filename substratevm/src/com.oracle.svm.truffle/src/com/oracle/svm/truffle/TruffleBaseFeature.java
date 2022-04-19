@@ -306,20 +306,9 @@ public final class TruffleBaseFeature implements com.oracle.svm.core.graal.Graal
                         .getProviderObjectReplacements(metaAccess);
         graalObjectReplacer = new GraalObjectReplacer(config.getUniverse(), metaAccess, providerReplacements);
 
-        Class<?> nodeFieldData = access.findClassByName("com.oracle.truffle.api.nodes.NodeClassImpl$NodeFieldData");
-        access.registerObjectReplacer((e) -> replaceNodeFieldAccessor(nodeFieldData, e));
-
         layoutInfoMapField = config.findField("com.oracle.truffle.object.DefaultLayout$LayoutInfo", "LAYOUT_INFO_MAP");
         layoutMapField = config.findField("com.oracle.truffle.object.DefaultLayout", "LAYOUT_MAP");
         libraryFactoryCacheField = config.findField("com.oracle.truffle.api.library.LibraryFactory$ResolvedDispatch", "CACHE");
-    }
-
-    @SuppressWarnings("deprecation")
-    private Object replaceNodeFieldAccessor(Class<?> invalidNodeFieldType, Object source) {
-        if (source != null && source.getClass() == invalidNodeFieldType) {
-            throw VMError.shouldNotReachHere("Cannot have NodeFieldData in image, they must be created lazily");
-        }
-        return source;
     }
 
     @SuppressWarnings("deprecation")
@@ -936,4 +925,29 @@ final class Target_com_oracle_truffle_api_nodes_Node {
     @AnnotateOriginal
     @NeverInline("")
     public native void adoptChildren();
+}
+
+@TargetClass(className = "com.oracle.truffle.api.nodes.NodeClassImpl", innerClass = "NodeFieldData", onlyWith = TruffleBaseFeature.IsEnabled.class)
+final class Target_com_oracle_truffle_api_nodes_NodeClassImpl_NodeFieldData {
+    @Alias @RecomputeFieldValue(kind = Kind.Custom, declClass = OffsetComputer.class) //
+    private long offset;
+
+    private static class OffsetComputer implements RecomputeFieldValue.CustomFieldValueComputer {
+        @Override
+        public RecomputeFieldValue.ValueAvailability valueAvailability() {
+            return RecomputeFieldValue.ValueAvailability.AfterAnalysis;
+        }
+
+        @Override
+        public Object compute(MetaAccessProvider metaAccess, ResolvedJavaField original, ResolvedJavaField annotated, Object receiver) {
+            /* Recompute the offset of the Field stored in this NodeFieldData.field. */
+            Field field = ReflectionUtil.readField(receiver.getClass(), "field", receiver);
+            return (long) metaAccess.lookupJavaField(field).getOffset();
+        }
+
+        @Override
+        public Class<?>[] types() {
+            return new Class<?>[]{long.class};
+        }
+    }
 }
