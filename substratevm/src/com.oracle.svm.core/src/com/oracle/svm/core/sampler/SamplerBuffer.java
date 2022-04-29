@@ -32,23 +32,23 @@ import org.graalvm.word.PointerBase;
 import org.graalvm.word.UnsignedWord;
 
 /**
- * A {@link ProfilerBuffer} is a block of native memory into which the results of stack walks are
+ * A {@link SamplerBuffer} is a block of native memory into which the results of stack walks are
  * written.
  */
 @RawStructure
-public interface ProfilerBuffer extends PointerBase {
+public interface SamplerBuffer extends PointerBase {
 
     /**
-     * Returns a buffer that is next in the list.
+     * Returns a buffer that is next in the {@link SamplerBufferStack}, otherwise null.
      */
     @RawField
-    ProfilerBuffer getNext();
+    SamplerBuffer getNext();
 
     /**
-     * Sets buffer that is next in the list.
+     * Sets a buffer as a new head in the {@link SamplerBufferStack}.
      */
     @RawField
-    void setNext(ProfilerBuffer buffer);
+    void setNext(SamplerBuffer buffer);
 
     /**
      * Returns the JFR id of the thread that owns this buffer.

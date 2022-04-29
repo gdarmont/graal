@@ -32,13 +32,13 @@ import com.oracle.svm.core.UnmanagedMemoryUtil;
 import com.oracle.svm.core.annotate.Uninterruptible;
 import com.oracle.svm.core.util.VMError;
 
-public class ProfilerSampleWriter {
+public class SamplerSampleWriter {
 
     private static final int END_MARKER_SIZE = Long.BYTES;
     private static final long END_MARKER = -1;
 
     @Uninterruptible(reason = "Called from uninterruptible code.", mayBeInlined = true)
-    public static boolean putLong(ProfilerSampleWriterData data, long value) {
+    public static boolean putLong(SamplerSampleWriterData data, long value) {
         if (ensureSize(data, Long.BYTES)) {
             data.getCurrentPos().writeLong(0, value);
             increaseCurrentPos(data, WordFactory.unsigned(Long.BYTES));
@@ -49,10 +49,10 @@ public class ProfilerSampleWriter {
     }
 
     @Uninterruptible(reason = "Called from uninterruptible code.", mayBeInlined = true)
-    public static void commit(ProfilerSampleWriterData data) {
-        ProfilerBuffer buffer = data.getProfilerBuffer();
+    public static void commit(SamplerSampleWriterData data) {
+        SamplerBuffer buffer = data.getSamplerBuffer();
         /*
-         * put END_MARKER should not fail as accommodation takes end marker size in consideration.
+         * put END_MARKER should not fail as ensureSize takes end marker size in consideration.
          */
         VMError.guarantee(getAvailableSize(data).aboveOrEqual(END_MARKER_SIZE));
         data.getCurrentPos().writeLong(0, END_MARKER);
@@ -62,7 +62,7 @@ public class ProfilerSampleWriter {
     }
 
     @Uninterruptible(reason = "Called from uninterruptible code.", mayBeInlined = true)
-    private static boolean ensureSize(ProfilerSampleWriterData data, int requested) {
+    private static boolean ensureSize(SamplerSampleWriterData data, int requested) {
         assert requested > 0;
         int totalRequested = requested + END_MARKER_SIZE;
         if (getAvailableSize(data).belowThan(totalRequested)) {
@@ -75,59 +75,59 @@ public class ProfilerSampleWriter {
     }
 
     @Uninterruptible(reason = "Called from uninterruptible code.", mayBeInlined = true)
-    private static boolean accommodate(ProfilerSampleWriterData data, UnsignedWord uncommitted) {
-        if (ProfilerBufferAccess.isEmpty(data.getProfilerBuffer())) {
+    private static boolean accommodate(SamplerSampleWriterData data, UnsignedWord uncommitted) {
+        if (SamplerBufferAccess.isEmpty(data.getSamplerBuffer())) {
             /*
              * Sample is too big to fit into the size of one buffer i.e. we want to do
              * accommodations while nothing is committed into buffer.
              */
-            ProfilerThreadLocal.increaseMissedSamples();
+            SamplerThreadLocal.increaseMissedSamples();
             return false;
         }
 
         /* Pop first free buffer from the pool. */
-        ProfilerBuffer newBuffer = SubstrateSigprofHandler.availableBuffers().popBuffer();
+        SamplerBuffer newBuffer = SubstrateSigprofHandler.availableBuffers().popBuffer();
         if (newBuffer.isNull()) {
             /* No available buffers on the pool. Fallback! */
-            ProfilerThreadLocal.increaseMissedSamples();
+            SamplerThreadLocal.increaseMissedSamples();
             return false;
         }
-        ProfilerThreadLocal.setThreadLocalBuffer(newBuffer);
+        SamplerThreadLocal.setThreadLocalBuffer(newBuffer);
 
         /* Copy the uncommitted content of old buffer into new one. */
-        UnmanagedMemoryUtil.copy(data.getStartPos(), ProfilerBufferAccess.getDataStart(newBuffer), uncommitted);
+        UnmanagedMemoryUtil.copy(data.getStartPos(), SamplerBufferAccess.getDataStart(newBuffer), uncommitted);
 
         /* Put in the stack with other unprocessed buffers. */
-        ProfilerBuffer oldBuffer = data.getProfilerBuffer();
+        SamplerBuffer oldBuffer = data.getSamplerBuffer();
         SubstrateSigprofHandler.fullBuffers().pushBuffer(oldBuffer);
 
         /* Reinitialize data structure. */
-        data.setProfilerBuffer(newBuffer);
-        hardReset(data);
+        data.setSamplerBuffer(newBuffer);
+        reset(data);
         increaseCurrentPos(data, uncommitted);
         return true;
     }
 
     @Uninterruptible(reason = "Called from uninterruptible code.", mayBeInlined = true)
-    private static UnsignedWord getAvailableSize(ProfilerSampleWriterData data) {
+    private static UnsignedWord getAvailableSize(SamplerSampleWriterData data) {
         return data.getEndPos().subtract(data.getCurrentPos());
     }
 
     @Uninterruptible(reason = "Called from uninterruptible code.", mayBeInlined = true)
-    private static UnsignedWord getUncommittedSize(ProfilerSampleWriterData data) {
+    private static UnsignedWord getUncommittedSize(SamplerSampleWriterData data) {
         return data.getCurrentPos().subtract(data.getStartPos());
     }
 
     @Uninterruptible(reason = "Called from uninterruptible code.", mayBeInlined = true)
-    private static void increaseCurrentPos(ProfilerSampleWriterData data, UnsignedWord delta) {
+    private static void increaseCurrentPos(SamplerSampleWriterData data, UnsignedWord delta) {
         data.setCurrentPos(data.getCurrentPos().add(delta));
     }
 
     @Uninterruptible(reason = "Called from uninterruptible code.", mayBeInlined = true)
-    private static void hardReset(ProfilerSampleWriterData data) {
-        ProfilerBuffer buffer = data.getProfilerBuffer();
+    private static void reset(SamplerSampleWriterData data) {
+        SamplerBuffer buffer = data.getSamplerBuffer();
         data.setStartPos(buffer.getPos());
         data.setCurrentPos(buffer.getPos());
-        data.setEndPos(ProfilerBufferAccess.getDataEnd(buffer));
+        data.setEndPos(SamplerBufferAccess.getDataEnd(buffer));
     }
 }

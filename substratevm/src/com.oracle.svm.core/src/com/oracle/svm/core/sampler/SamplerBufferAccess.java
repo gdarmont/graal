@@ -38,22 +38,22 @@ import com.oracle.svm.core.config.ConfigurationValues;
 import com.oracle.svm.core.util.UnsignedUtils;
 
 /**
- * Used to access the raw memory of a {@link ProfilerBufferAccess}.
+ * Used to access the raw memory of a {@link SamplerBufferAccess}.
  */
-public final class ProfilerBufferAccess {
+public final class SamplerBufferAccess {
 
-    private ProfilerBufferAccess() {
+    private SamplerBufferAccess() {
     }
 
     @Fold
     public static UnsignedWord getHeaderSize() {
-        return UnsignedUtils.roundUp(SizeOf.unsigned(ProfilerBuffer.class), WordFactory.unsigned(ConfigurationValues.getTarget().wordSize));
+        return UnsignedUtils.roundUp(SizeOf.unsigned(SamplerBuffer.class), WordFactory.unsigned(ConfigurationValues.getTarget().wordSize));
     }
 
     @Uninterruptible(reason = "Called from uninterruptible code.", mayBeInlined = true)
-    public static ProfilerBuffer allocate(UnsignedWord dataSize) {
-        UnsignedWord headerSize = ProfilerBufferAccess.getHeaderSize();
-        ProfilerBuffer result = ImageSingletons.lookup(UnmanagedMemorySupport.class).malloc(headerSize.add(dataSize));
+    public static SamplerBuffer allocate(UnsignedWord dataSize) {
+        UnsignedWord headerSize = SamplerBufferAccess.getHeaderSize();
+        SamplerBuffer result = ImageSingletons.lookup(UnmanagedMemorySupport.class).malloc(headerSize.add(dataSize));
         if (result.isNonNull()) {
             result.setSize(dataSize);
             result.setFreeable(false);
@@ -63,29 +63,29 @@ public final class ProfilerBufferAccess {
     }
 
     @Uninterruptible(reason = "Called from uninterruptible code.", mayBeInlined = true)
-    public static void free(ProfilerBuffer buffer) {
+    public static void free(SamplerBuffer buffer) {
         ImageSingletons.lookup(UnmanagedMemorySupport.class).free(buffer);
     }
 
     @Uninterruptible(reason = "Called from uninterruptible code.", mayBeInlined = true)
-    public static void reinitialize(ProfilerBuffer buffer) {
+    public static void reinitialize(SamplerBuffer buffer) {
         Pointer dataStart = getDataStart(buffer);
         buffer.setPos(dataStart);
         buffer.setOwner(0L);
     }
 
     @Uninterruptible(reason = "Called from uninterruptible code.", mayBeInlined = true)
-    public static Pointer getDataStart(ProfilerBuffer buffer) {
+    public static Pointer getDataStart(SamplerBuffer buffer) {
         return ((Pointer) buffer).add(getHeaderSize());
     }
 
     @Uninterruptible(reason = "Called from uninterruptible code.", mayBeInlined = true)
-    public static boolean isEmpty(ProfilerBuffer buffer) {
+    public static boolean isEmpty(SamplerBuffer buffer) {
         return getDataStart(buffer).equal(buffer.getPos());
     }
 
     @Uninterruptible(reason = "Called from uninterruptible code.", mayBeInlined = true)
-    public static Pointer getDataEnd(ProfilerBuffer buffer) {
+    public static Pointer getDataEnd(SamplerBuffer buffer) {
         return getDataStart(buffer).add(buffer.getSize());
     }
 }

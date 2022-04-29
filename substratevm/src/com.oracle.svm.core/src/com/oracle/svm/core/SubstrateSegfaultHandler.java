@@ -204,6 +204,11 @@ public abstract class SubstrateSegfaultHandler {
             }
         }
 
+        @Override
+        @Uninterruptible(reason = "Isolate teardown.")
+        public void beforeIsolateTearDown() {
+        }
+
         @Uninterruptible(reason = "Thread state not yet set up.")
         public Isolate getIsolate() {
             return baseIsolate.get().readWord(0);

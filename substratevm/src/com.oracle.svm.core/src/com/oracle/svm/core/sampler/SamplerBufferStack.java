@@ -37,23 +37,23 @@ import com.oracle.svm.core.annotate.Uninterruptible;
  * The stack uses spin-lock to protect itself from races with competing pop operations (ABA
  * problem).
  *
- * @see ProfilerSpinLock
+ * @see SamplerSpinLock
  */
-public class ProfilerBufferStack {
+public class SamplerBufferStack {
 
-    private ProfilerBuffer head;
-    private final ProfilerSpinLock spinLock;
+    private SamplerBuffer head;
+    private final SamplerSpinLock spinLock;
 
     @Platforms(Platform.HOSTED_ONLY.class)
-    public ProfilerBufferStack() {
-        this.spinLock = new ProfilerSpinLock();
+    public SamplerBufferStack() {
+        this.spinLock = new SamplerSpinLock();
     }
 
     /**
      * Push a profiler buffer into the global linked list.
      */
     @Uninterruptible(reason = "Locking without transition requires that the whole critical section is uninterruptible.")
-    public void pushBuffer(ProfilerBuffer buffer) {
+    public void pushBuffer(SamplerBuffer buffer) {
         spinLock.lock();
         try {
             buffer.setNext(head);
@@ -67,10 +67,10 @@ public class ProfilerBufferStack {
      * Pop a profiler buffer from the global linked list. Returns {@code null} if the list is empty.
      */
     @Uninterruptible(reason = "Locking without transition requires that the whole critical section is uninterruptible.")
-    public ProfilerBuffer popBuffer() {
+    public SamplerBuffer popBuffer() {
         spinLock.lock();
         try {
-            ProfilerBuffer result = head;
+            SamplerBuffer result = head;
             if (result.isNonNull()) {
                 head = head.getNext();
                 result.setNext(WordFactory.nullPointer());
@@ -85,7 +85,7 @@ public class ProfilerBufferStack {
      * Returns the lock that this stack is using.
      */
     @Uninterruptible(reason = "Called from uninterruptible code.", mayBeInlined = true)
-    public ProfilerSpinLock getLock() {
+    public SamplerSpinLock getLock() {
         return spinLock;
     }
 }

@@ -29,7 +29,6 @@ import java.util.List;
 
 import org.graalvm.compiler.api.replacements.Fold;
 import org.graalvm.compiler.core.common.NumUtil;
-import org.graalvm.nativeimage.CurrentIsolate;
 import org.graalvm.nativeimage.ImageSingletons;
 import org.graalvm.nativeimage.IsolateThread;
 import org.graalvm.nativeimage.Platform;
@@ -265,11 +264,6 @@ public class SubstrateJVM {
         long threadId = threadLocal.getTraceId(isolateThread);
         VMError.guarantee(threadId > 0);
         return threadId;
-    }
-
-    @Uninterruptible(reason = "Called from uninterruptible code.", mayBeInlined = true)
-    public long getThreadId() {
-        return getThreadId(CurrentIsolate.getCurrentThread());
     }
 
     /** See {@link JVM#storeMetadataDescriptor}. */

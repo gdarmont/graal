@@ -33,27 +33,32 @@ import com.oracle.svm.core.util.VMError;
 
 import jdk.jfr.internal.Options;
 
-public class ProfilerBufferUtils {
+/**
+ * The pool that maintains the desirable number of buffers in the system by allocating/releasing
+ * extra buffers.
+ */
+public class SamplerBufferPool {
 
     private static final long THREAD_BUFFER_SIZE = Options.getThreadBufferSize();
 
     private static final VMMutex mutex = new VMMutex("profilerBufferUtils");
 
-    /**
-     * The total number of profiler buffer in the system.
-     */
     private static long bufferCount;
 
-    /**
-     * Push a profiler buffer into the global linked list.
-     */
     @Uninterruptible(reason = "Locking without transition requires that the whole critical section is uninterruptible.", mayBeInlined = true)
-    public static void allocateBuffers() {
+    public static void adjustBufferCount(SamplerBuffer threadLocalBuffer) {
         mutex.lockNoTransition();
         try {
             long diff = diff();
-            for (int i = 0; i < diff; i++) {
-                allocateAndPush();
+            if (diff > 0) {
+                for (int i = 0; i < diff; i++) {
+                    allocateAndPush();
+                }
+            } else {
+                releaseThreadLocalBuffer(threadLocalBuffer);
+                for (long i = diff; i < 0; i++) {
+                    popAndFree();
+                }
             }
         } finally {
             mutex.unlock();
@@ -63,7 +68,7 @@ public class ProfilerBufferUtils {
     @Uninterruptible(reason = "Called from uninterruptible code.", mayBeInlined = true)
     private static void allocateAndPush() {
         VMError.guarantee(bufferCount >= 0);
-        ProfilerBuffer buffer = ProfilerBufferAccess.allocate(WordFactory.unsigned(THREAD_BUFFER_SIZE));
+        SamplerBuffer buffer = SamplerBufferAccess.allocate(WordFactory.unsigned(THREAD_BUFFER_SIZE));
         if (buffer.isNull()) {
             return;
         }
@@ -71,41 +76,36 @@ public class ProfilerBufferUtils {
         bufferCount++;
     }
 
-    /**
-     * Free all buffers that are not necessary.
-     */
     @Uninterruptible(reason = "Locking without transition requires that the whole critical section is uninterruptible.", mayBeInlined = true)
-    public static void freeBuffers(boolean alreadyFreed) {
-        mutex.lockNoTransition();
-        try {
-            if (alreadyFreed) {
-                VMError.guarantee(bufferCount > 0);
-                bufferCount--;
+    private static void releaseThreadLocalBuffer(SamplerBuffer buffer) {
+        /* buffer will be null if no stack walk were performed. */
+        if (buffer.isNonNull()) {
+            if (SamplerBufferAccess.isEmpty(buffer)) {
+                /* We can free it right away. */
+                SamplerBufferAccess.free(buffer);
+            } else {
+                /* Put it in the stack with other unprocessed buffers. */
+                buffer.setFreeable(true);
+                SubstrateSigprofHandler.fullBuffers().pushBuffer(buffer);
             }
-            long diff = diff();
-            if (diff < 0) {
-                diff = -diff;
-                for (int i = 0; i < diff; i++) {
-                    pullAndFree();
-                }
-            }
-        } finally {
-            mutex.unlock();
+            VMError.guarantee(bufferCount > 0);
+            bufferCount--;
         }
     }
 
     @Uninterruptible(reason = "Called from uninterruptible code.", mayBeInlined = true)
-    private static void pullAndFree() {
+    private static void popAndFree() {
         VMError.guarantee(bufferCount > 0);
-        ProfilerBuffer buffer = SubstrateSigprofHandler.availableBuffers().popBuffer();
-        ProfilerBufferAccess.free(buffer);
-        bufferCount--;
+        SamplerBuffer buffer = SubstrateSigprofHandler.availableBuffers().popBuffer();
+        if (buffer.isNonNull()) {
+            SamplerBufferAccess.free(buffer);
+            bufferCount--;
+        }
     }
 
     @Uninterruptible(reason = "Called from uninterruptible code.", mayBeInlined = true)
     private static long diff() {
         double diffD = SubstrateSigprofHandler.getSubstrateThreadMXBean().getThreadCount() * 1.5 - bufferCount;
-        long diffL = (long) diffD;
-        return diffL + (diffL != diffD ? 1 : 0);
+        return (long) (diffD + 0.5);
     }
 }

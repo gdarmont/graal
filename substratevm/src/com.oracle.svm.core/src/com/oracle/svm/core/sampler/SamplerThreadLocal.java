@@ -25,6 +25,7 @@
 
 package com.oracle.svm.core.sampler;
 
+import org.graalvm.nativeimage.CurrentIsolate;
 import org.graalvm.nativeimage.IsolateThread;
 import org.graalvm.word.UnsignedWord;
 import org.graalvm.word.WordFactory;
@@ -37,14 +38,15 @@ import com.oracle.svm.core.threadlocal.FastThreadLocalLong;
 import com.oracle.svm.core.threadlocal.FastThreadLocalWord;
 import com.oracle.svm.core.util.VMError;
 
-public class ProfilerThreadLocal implements ThreadListener {
+public class SamplerThreadLocal implements ThreadListener {
 
-    private static final FastThreadLocalWord<ProfilerBuffer> localBuffer = FastThreadLocalFactory.createWord("ProfilerThreadLocal.localBuffer");
-    private static final FastThreadLocalLong missedSamples = FastThreadLocalFactory.createLong("ProfilerThreadLocal.missedSamples");
+    private static final FastThreadLocalWord<SamplerBuffer> localBuffer = FastThreadLocalFactory.createWord("SamplerThreadLocal.localBuffer");
+    private static final FastThreadLocalLong missedSamples = FastThreadLocalFactory.createLong("SamplerThreadLocal.missedSamples");
+    private static final FastThreadLocalLong unparseableStacks = FastThreadLocalFactory.createLong("SamplerThreadLocal.unparseableStacks");
     /**
      * The data that we are using during the stack walk, allocated on the stack.
      */
-    private static final FastThreadLocalWord<ProfilerSampleWriterData> writerData = FastThreadLocalFactory.createWord("ProfilerThreadLocal.writerData");
+    private static final FastThreadLocalWord<SamplerSampleWriterData> writerData = FastThreadLocalFactory.createWord("SamplerThreadLocal.writerData");
 
     @Override
     @Uninterruptible(reason = "Only uninterruptible code may be executed before Thread.run.")
@@ -56,8 +58,8 @@ public class ProfilerThreadLocal implements ThreadListener {
 
     @Uninterruptible(reason = "Called from uninterruptible code.", mayBeInlined = true)
     public static void initialize(IsolateThread isolateThread) {
-        /* Allocate new buffer(s). */
-        ProfilerBufferUtils.allocateBuffers();
+        /* Adjust the number of buffers (there is no thread-local buffer yet). */
+        SamplerBufferPool.adjustBufferCount(WordFactory.nullPointer());
 
         /*
          * Save isolate thread in thread-local area.
@@ -65,7 +67,7 @@ public class ProfilerThreadLocal implements ThreadListener {
          * Once this value is set, the signal handler may interrupt this thread at any time. So, it
          * is essential that this value is set at the very end of this method.
          */
-        UnsignedWord key = ProfilerIsolateLocal.getKey();
+        UnsignedWord key = SamplerIsolateLocal.getKey();
         VMError.guarantee(key.aboveThan(0));
         SubstrateSigprofHandler.singleton().setThreadLocalKeyValue(key, isolateThread);
     }
@@ -81,38 +83,25 @@ public class ProfilerThreadLocal implements ThreadListener {
              * anymore. So, it is essential that this value is set at the very beginning of this
              * method i.e. before doing cleanup.
              */
-            UnsignedWord key = ProfilerIsolateLocal.getKey();
+            UnsignedWord key = SamplerIsolateLocal.getKey();
             VMError.guarantee(key.aboveThan(0));
             SubstrateSigprofHandler.singleton().setThreadLocalKeyValue(key, WordFactory.nullPointer());
 
-            /* Free the thread-local buffer. */
-            ProfilerBuffer buffer = localBuffer.get(isolateThread);
-            /* buffer will be null if no stack walk were performed. */
-            if (buffer.isNonNull()) {
-                if (ProfilerBufferAccess.isEmpty(buffer)) {
-                    /* We can free it right away. */
-                    ProfilerBufferAccess.free(buffer);
-                } else {
-                    /* Put it in the stack with other unprocessed buffers. */
-                    buffer.setFreeable(true);
-                    SubstrateSigprofHandler.fullBuffers().pushBuffer(buffer);
-                }
-                ProfilerBufferUtils.freeBuffers(true);
-                localBuffer.set(isolateThread, WordFactory.nullPointer());
-            } else {
-                ProfilerBufferUtils.freeBuffers(false);
-            }
+            /* Adjust the number of buffers (including the thread-local buffer). */
+            SamplerBuffer threadLocalBuffer = localBuffer.get(isolateThread);
+            SamplerBufferPool.adjustBufferCount(threadLocalBuffer);
+            localBuffer.set(isolateThread, WordFactory.nullPointer());
         }
     }
 
     @Uninterruptible(reason = "Called from uninterruptible code.", mayBeInlined = true)
-    public static ProfilerBuffer getThreadLocalBuffer() {
+    public static SamplerBuffer getThreadLocalBuffer() {
         return localBuffer.get();
     }
 
     @Uninterruptible(reason = "Called from uninterruptible code.", mayBeInlined = true)
-    public static void setThreadLocalBuffer(ProfilerBuffer buffer) {
-        buffer.setOwner(SubstrateJVM.get().getThreadId());
+    public static void setThreadLocalBuffer(SamplerBuffer buffer) {
+        buffer.setOwner(SubstrateJVM.get().getThreadId(CurrentIsolate.getCurrentThread()));
         localBuffer.set(buffer);
     }
 
@@ -127,12 +116,22 @@ public class ProfilerThreadLocal implements ThreadListener {
     }
 
     @Uninterruptible(reason = "Called from uninterruptible code.", mayBeInlined = true)
-    public static void setWriterData(ProfilerSampleWriterData data) {
+    public static void increaseUnparseableStacks() {
+        unparseableStacks.set(getUnparseableStacks() + 1);
+    }
+
+    @Uninterruptible(reason = "Called from uninterruptible code.", mayBeInlined = true)
+    public static long getUnparseableStacks() {
+        return unparseableStacks.get();
+    }
+
+    @Uninterruptible(reason = "Called from uninterruptible code.", mayBeInlined = true)
+    public static void setWriterData(SamplerSampleWriterData data) {
         writerData.set(data);
     }
 
     @Uninterruptible(reason = "Called from uninterruptible code.", mayBeInlined = true)
-    public static ProfilerSampleWriterData getWriterData() {
+    public static SamplerSampleWriterData getWriterData() {
         return writerData.get();
     }
 }

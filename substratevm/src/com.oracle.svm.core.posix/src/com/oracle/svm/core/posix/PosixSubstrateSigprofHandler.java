@@ -111,7 +111,7 @@ public class PosixSubstrateSigprofHandler extends SubstrateSigprofHandler {
 
     @Override
     @Uninterruptible(reason = "Called from uninterruptible code.", mayBeInlined = true)
-    public UnsignedWord createThreadLocalKey() {
+    protected UnsignedWord createThreadLocalKey() {
         Pthread.pthread_key_tPointer key = StackValue.get(Pthread.pthread_key_tPointer.class);
         PosixUtils.checkStatusIs0(Pthread.pthread_key_create(key, WordFactory.nullPointer()), "pthread_key_create(key, keyDestructor): failed.");
         return key.read();
@@ -119,14 +119,21 @@ public class PosixSubstrateSigprofHandler extends SubstrateSigprofHandler {
 
     @Override
     @Uninterruptible(reason = "Called from uninterruptible code.", mayBeInlined = true)
-    public void setThreadLocalKeyValue(UnsignedWord key, IsolateThread value) {
+    protected void deleteThreadLocalKey(UnsignedWord key) {
+        int resultCode = Pthread.pthread_key_delete((Pthread.pthread_key_t) key);
+        PosixUtils.checkStatusIs0(resultCode, "pthread_key_delete(key): failed.");
+    }
+
+    @Override
+    @Uninterruptible(reason = "Called from uninterruptible code.", mayBeInlined = true)
+    protected void setThreadLocalKeyValue(UnsignedWord key, IsolateThread value) {
         int resultCode = Pthread.pthread_setspecific((Pthread.pthread_key_t) key, (VoidPointer) value);
         PosixUtils.checkStatusIs0(resultCode, "pthread_setspecific(key, value): wrong arguments.");
     }
 
     @Override
     @Uninterruptible(reason = "Called from uninterruptible code.", mayBeInlined = true)
-    public IsolateThread getThreadLocalKeyValue(UnsignedWord key) {
+    protected IsolateThread getThreadLocalKeyValue(UnsignedWord key) {
         /*
          * Although this method is not async-signal-safe in general we rely on
          * implementation-specific behavior here.

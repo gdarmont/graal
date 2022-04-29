@@ -25,47 +25,25 @@
 
 package com.oracle.svm.core.sampler;
 
-import org.graalvm.nativeimage.Isolate;
-import org.graalvm.word.LocationIdentity;
+import org.graalvm.nativeimage.c.function.CodePointer;
 import org.graalvm.word.Pointer;
-import org.graalvm.word.UnsignedWord;
-import org.graalvm.word.WordFactory;
 
-import com.oracle.svm.core.IsolateListenerSupport;
 import com.oracle.svm.core.annotate.Uninterruptible;
-import com.oracle.svm.core.c.CGlobalData;
-import com.oracle.svm.core.c.CGlobalDataFactory;
+import com.oracle.svm.core.code.CodeInfo;
+import com.oracle.svm.core.deopt.DeoptimizedFrame;
+import com.oracle.svm.core.stack.ParameterizedStackFrameVisitor;
 
-public class ProfilerIsolateLocal implements IsolateListenerSupport.IsolateListener {
-
-    /** Stores the address of the first isolate created. */
-    private static final CGlobalData<Pointer> firstIsolate = CGlobalDataFactory.createWord();
-
-    /** Stores the isolate-specific key. */
-    private static UnsignedWord key = WordFactory.unsigned(0);
+public final class SamplerStackWalkVisitor extends ParameterizedStackFrameVisitor<Void> {
+    @Override
+    @Uninterruptible(reason = "Called from uninterruptible code.", mayBeInlined = true)
+    protected boolean visitFrame(Pointer sp, CodePointer ip, CodeInfo codeInfo, DeoptimizedFrame deoptimizedFrame, Void voidData) {
+        return SamplerSampleWriter.putLong(SamplerThreadLocal.getWriterData(), ip.rawValue());
+    }
 
     @Override
-    @Uninterruptible(reason = "Thread state not yet set up.")
-    public void afterCreateIsolate(Isolate isolate) {
-        if (SubstrateSigprofHandler.isProfilingSupported()) {
-            if (firstIsolate.get().logicCompareAndSwapWord(0, WordFactory.zero(), isolate, LocationIdentity.ANY_LOCATION)) {
-                key = SubstrateSigprofHandler.singleton().createThreadLocalKey();
-            }
-        }
-    }
-
     @Uninterruptible(reason = "Called from uninterruptible code.", mayBeInlined = true)
-    public static Isolate getIsolate() {
-        return firstIsolate.get().readWord(0);
-    }
-
-    @Uninterruptible(reason = "Called from uninterruptible code.", mayBeInlined = true)
-    public static UnsignedWord getKey() {
-        return key;
-    }
-
-    @Uninterruptible(reason = "Called from uninterruptible code.", mayBeInlined = true)
-    public static boolean isKeySet() {
-        return key.notEqual(0);
+    protected boolean unknownFrame(Pointer sp, CodePointer ip, DeoptimizedFrame deoptimizedFrame, Void data) {
+        SamplerThreadLocal.increaseUnparseableStacks();
+        return false;
     }
 }

@@ -31,22 +31,22 @@ import org.graalvm.word.Pointer;
 import org.graalvm.word.PointerBase;
 
 /**
- * A data structure that holds the mutable state of a {@link ProfilerSampleWriter}. Typically, it is
+ * A data structure that holds the mutable state of a {@link SamplerSampleWriter}. Typically, it is
  * allocated on the stack.
  */
 @RawStructure
-public interface ProfilerSampleWriterData extends PointerBase {
+public interface SamplerSampleWriterData extends PointerBase {
     /**
      * Gets the buffer that data will be written to.
      */
     @RawField
-    ProfilerBuffer getProfilerBuffer();
+    SamplerBuffer getSamplerBuffer();
 
     /**
      * Sets the buffer that data will be written to.
      */
     @RawField
-    void setProfilerBuffer(ProfilerBuffer buffer);
+    void setSamplerBuffer(SamplerBuffer buffer);
 
     /**
      * Gets the start position for the current sample write.

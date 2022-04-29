@@ -25,6 +25,7 @@
 
 package com.oracle.svm.core.sampler;
 
+import com.oracle.svm.core.util.VMError;
 import org.graalvm.compiler.nodes.PauseNode;
 import org.graalvm.nativeimage.CurrentIsolate;
 import org.graalvm.nativeimage.IsolateThread;
@@ -39,32 +40,34 @@ import com.oracle.svm.core.jdk.UninterruptibleUtils;
  * The custom implementation of spin lock that is async signal safe.
  * 
  * In some specific situations, the signal handler can interrupt execution while the same thread
- * already has the lock. Using existing spin lock implementations will cause the deadlock in such a
- * case.
+ * already has the lock. Other spin lock implementations can deadlock in such a case. So it is
+ * essential to check if the current thread is the owner of the lock, before acquiring it.
  */
-public class ProfilerSpinLock {
-    private final UninterruptibleUtils.AtomicPointer<IsolateThread> thread;
+public class SamplerSpinLock {
+    private final UninterruptibleUtils.AtomicPointer<IsolateThread> owner;
 
     @Platforms(Platform.HOSTED_ONLY.class)
-    public ProfilerSpinLock() {
-        this.thread = new UninterruptibleUtils.AtomicPointer<>();
+    public SamplerSpinLock() {
+        this.owner = new UninterruptibleUtils.AtomicPointer<>();
     }
 
     @Uninterruptible(reason = "Called from uninterruptible code.", mayBeInlined = true)
     public boolean isOwner() {
-        return thread.get().equal(CurrentIsolate.getCurrentThread());
+        return owner.get().equal(CurrentIsolate.getCurrentThread());
     }
 
     @Uninterruptible(reason = "This method does not do a transition, so the whole critical section must be uninterruptible.", callerMustBe = true)
     public void lock() {
+        VMError.guarantee(!isOwner(), "The current thread already has a lock!");
         IsolateThread currentThread = CurrentIsolate.getCurrentThread();
-        while (!thread.compareAndSet(WordFactory.nullPointer(), currentThread)) {
+        while (!owner.compareAndSet(WordFactory.nullPointer(), currentThread)) {
             PauseNode.pause();
         }
     }
 
     @Uninterruptible(reason = "The whole critical section must be uninterruptible.", callerMustBe = true)
     public void unlock() {
-        thread.compareAndSet(CurrentIsolate.getCurrentThread(), WordFactory.nullPointer());
+        VMError.guarantee(isOwner(), "The current thread doesn't have a lock!");
+        owner.compareAndSet(CurrentIsolate.getCurrentThread(), WordFactory.nullPointer());
     }
 }
