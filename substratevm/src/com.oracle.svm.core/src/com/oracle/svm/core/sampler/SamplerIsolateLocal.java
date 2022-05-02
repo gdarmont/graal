@@ -58,7 +58,7 @@ public class SamplerIsolateLocal implements IsolateListenerSupport.IsolateListen
     @Uninterruptible(reason = "Isolate teardown.")
     public void beforeIsolateTearDown() {
         if (SubstrateSigprofHandler.isProfilingSupported()) {
-            if (firstIsolate.get().isNonNull()) {
+            if (isKeySet()) {
                 SubstrateSigprofHandler.singleton().deleteThreadLocalKey(key);
             }
         }
