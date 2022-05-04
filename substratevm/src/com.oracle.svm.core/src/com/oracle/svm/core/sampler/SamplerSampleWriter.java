@@ -32,7 +32,7 @@ import com.oracle.svm.core.UnmanagedMemoryUtil;
 import com.oracle.svm.core.annotate.Uninterruptible;
 import com.oracle.svm.core.util.VMError;
 
-public class SamplerSampleWriter {
+class SamplerSampleWriter {
 
     private static final int END_MARKER_SIZE = Long.BYTES;
     private static final long END_MARKER = -1;

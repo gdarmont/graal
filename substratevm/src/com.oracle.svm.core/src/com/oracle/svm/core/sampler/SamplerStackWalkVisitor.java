@@ -33,7 +33,7 @@ import com.oracle.svm.core.code.CodeInfo;
 import com.oracle.svm.core.deopt.DeoptimizedFrame;
 import com.oracle.svm.core.stack.ParameterizedStackFrameVisitor;
 
-public final class SamplerStackWalkVisitor extends ParameterizedStackFrameVisitor<Void> {
+final class SamplerStackWalkVisitor extends ParameterizedStackFrameVisitor<Void> {
     @Override
     @Uninterruptible(reason = "Called from uninterruptible code.", mayBeInlined = true)
     protected boolean visitFrame(Pointer sp, CodePointer ip, CodeInfo codeInfo, DeoptimizedFrame deoptimizedFrame, Void voidData) {

@@ -40,7 +40,7 @@ import com.oracle.svm.core.util.UnsignedUtils;
 /**
  * Used to access the raw memory of a {@link SamplerBufferAccess}.
  */
-public final class SamplerBufferAccess {
+final class SamplerBufferAccess {
 
     private SamplerBufferAccess() {
     }

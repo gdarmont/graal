@@ -36,7 +36,7 @@ import com.oracle.svm.core.annotate.Uninterruptible;
 import com.oracle.svm.core.c.CGlobalData;
 import com.oracle.svm.core.c.CGlobalDataFactory;
 
-public class SamplerIsolateLocal implements IsolateListenerSupport.IsolateListener {
+class SamplerIsolateLocal implements IsolateListenerSupport.IsolateListener {
 
     /** Stores the address of the first isolate created. */
     private static final CGlobalData<Pointer> firstIsolate = CGlobalDataFactory.createWord();

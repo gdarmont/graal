@@ -58,7 +58,7 @@ public class SamplerSpinLock {
 
     @Uninterruptible(reason = "This method does not do a transition, so the whole critical section must be uninterruptible.", callerMustBe = true)
     public void lock() {
-        VMError.guarantee(!isOwner(), "The current thread already has a lock!");
+        VMError.guarantee(!isOwner(), "The current thread already has the lock!");
         IsolateThread currentThread = CurrentIsolate.getCurrentThread();
         while (!owner.compareAndSet(WordFactory.nullPointer(), currentThread)) {
             PauseNode.pause();
@@ -67,7 +67,7 @@ public class SamplerSpinLock {
 
     @Uninterruptible(reason = "The whole critical section must be uninterruptible.", callerMustBe = true)
     public void unlock() {
-        VMError.guarantee(isOwner(), "The current thread doesn't have a lock!");
+        VMError.guarantee(isOwner(), "The current thread doesn't have the lock!");
         owner.compareAndSet(CurrentIsolate.getCurrentThread(), WordFactory.nullPointer());
     }
 }

@@ -39,7 +39,7 @@ import com.oracle.svm.core.annotate.Uninterruptible;
  *
  * @see SamplerSpinLock
  */
-public class SamplerBufferStack {
+class SamplerBufferStack {
 
     private SamplerBuffer head;
     private final SamplerSpinLock spinLock;
@@ -85,7 +85,7 @@ public class SamplerBufferStack {
      * Returns the lock that this stack is using.
      */
     @Uninterruptible(reason = "Called from uninterruptible code.", mayBeInlined = true)
-    public SamplerSpinLock getLock() {
-        return spinLock;
+    public boolean isLockedByCurrentThread() {
+        return spinLock.isOwner();
     }
 }

@@ -37,7 +37,7 @@ import jdk.jfr.internal.Options;
  * The pool that maintains the desirable number of buffers in the system by allocating/releasing
  * extra buffers.
  */
-public class SamplerBufferPool {
+class SamplerBufferPool {
 
     private static final long THREAD_BUFFER_SIZE = Options.getThreadBufferSize();
 
@@ -49,19 +49,36 @@ public class SamplerBufferPool {
     public static void adjustBufferCount(SamplerBuffer threadLocalBuffer) {
         mutex.lockNoTransition();
         try {
-            long diff = diff();
-            if (diff > 0) {
-                for (int i = 0; i < diff; i++) {
-                    allocateAndPush();
-                }
-            } else {
-                releaseThreadLocalBuffer(threadLocalBuffer);
-                for (long i = diff; i < 0; i++) {
-                    popAndFree();
-                }
-            }
+            releaseThreadLocalBuffer(threadLocalBuffer);
+            adjustBufferCount0();
         } finally {
             mutex.unlock();
+        }
+    }
+
+    @Uninterruptible(reason = "Locking without transition requires that the whole critical section is uninterruptible.", mayBeInlined = true)
+    public static void adjustBufferCount() {
+        mutex.lockNoTransition();
+        try {
+            adjustBufferCount0();
+        } finally {
+            mutex.unlock();
+        }
+    }
+
+    @Uninterruptible(reason = "Locking without transition requires that the whole critical section is uninterruptible.", mayBeInlined = true)
+    public static void adjustBufferCount0() {
+        long diff = diff();
+        if (diff > 0) {
+            for (int i = 0; i < diff; i++) {
+                allocateAndPush();
+            }
+        } else {
+            for (long i = diff; i < 0; i++) {
+                if (!popAndFree()) {
+                    break;
+                }
+            }
         }
     }
 
@@ -94,13 +111,15 @@ public class SamplerBufferPool {
     }
 
     @Uninterruptible(reason = "Called from uninterruptible code.", mayBeInlined = true)
-    private static void popAndFree() {
+    private static boolean popAndFree() {
         VMError.guarantee(bufferCount > 0);
         SamplerBuffer buffer = SubstrateSigprofHandler.availableBuffers().popBuffer();
         if (buffer.isNonNull()) {
             SamplerBufferAccess.free(buffer);
             bufferCount--;
+            return false;
         }
+        return true;
     }
 
     @Uninterruptible(reason = "Called from uninterruptible code.", mayBeInlined = true)

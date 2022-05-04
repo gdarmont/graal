@@ -38,7 +38,7 @@ import com.oracle.svm.core.threadlocal.FastThreadLocalLong;
 import com.oracle.svm.core.threadlocal.FastThreadLocalWord;
 import com.oracle.svm.core.util.VMError;
 
-public class SamplerThreadLocal implements ThreadListener {
+class SamplerThreadLocal implements ThreadListener {
 
     private static final FastThreadLocalWord<SamplerBuffer> localBuffer = FastThreadLocalFactory.createWord("SamplerThreadLocal.localBuffer");
     private static final FastThreadLocalLong missedSamples = FastThreadLocalFactory.createLong("SamplerThreadLocal.missedSamples");
@@ -58,8 +58,8 @@ public class SamplerThreadLocal implements ThreadListener {
 
     @Uninterruptible(reason = "Called from uninterruptible code.", mayBeInlined = true)
     public static void initialize(IsolateThread isolateThread) {
-        /* Adjust the number of buffers (there is no thread-local buffer yet). */
-        SamplerBufferPool.adjustBufferCount(WordFactory.nullPointer());
+        /* Adjust the number of buffers. */
+        SamplerBufferPool.adjustBufferCount();
 
         /*
          * Save isolate thread in thread-local area.

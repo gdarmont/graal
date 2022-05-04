@@ -35,7 +35,7 @@ import org.graalvm.word.PointerBase;
  * allocated on the stack.
  */
 @RawStructure
-public interface SamplerSampleWriterData extends PointerBase {
+interface SamplerSampleWriterData extends PointerBase {
     /**
      * Gets the buffer that data will be written to.
      */

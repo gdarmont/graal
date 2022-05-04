@@ -36,7 +36,7 @@ import org.graalvm.word.UnsignedWord;
  * written.
  */
 @RawStructure
-public interface SamplerBuffer extends PointerBase {
+interface SamplerBuffer extends PointerBase {
 
     /**
      * Returns a buffer that is next in the {@link SamplerBufferStack}, otherwise null.
