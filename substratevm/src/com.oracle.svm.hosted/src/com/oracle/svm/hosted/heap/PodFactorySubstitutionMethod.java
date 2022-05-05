@@ -32,6 +32,7 @@ import java.util.concurrent.ConcurrentMap;
 import org.graalvm.compiler.core.common.type.StampFactory;
 import org.graalvm.compiler.debug.DebugContext;
 import org.graalvm.compiler.debug.GraalError;
+import org.graalvm.compiler.graph.NodeSourcePosition;
 import org.graalvm.compiler.nodes.CallTargetNode.InvokeKind;
 import org.graalvm.compiler.nodes.ConstantNode;
 import org.graalvm.compiler.nodes.FixedNode;
@@ -106,6 +107,10 @@ final class PodFactorySubstitutionMethod extends CustomSubstitutionMethod {
         HostedGraphKit kit = new HostedGraphKit(debug, providers, method);
         boolean isDeoptTarget = (method instanceof SharedMethod) && ((SharedMethod) method).isDeoptTarget();
 
+        // Needed to match type flows to invokes when preparing runtime compilation, see
+        // GraalFeature.processMethod() and MethodTypeFlowBuilder.uniqueKey()
+        kit.getGraph().setTrackNodeSourcePosition();
+
         ResolvedJavaType factoryType = method.getDeclaringClass();
         PodFactory annotation = factoryType.getAnnotation(PodFactory.class);
         ResolvedJavaType podConcreteType = kit.getMetaAccess().lookupJavaType(annotation.podClass());
@@ -168,7 +173,9 @@ final class PodFactorySubstitutionMethod extends CustomSubstitutionMethod {
 
     /** @see com.oracle.svm.hosted.phases.HostedGraphBuilderPhase */
     private static int invokeWithDeoptAndExceptionUnwind(HostedGraphKit kit, boolean isDeoptTarget, int initialNextDeoptIndex, ResolvedJavaMethod target, InvokeKind invokeKind, ValueNode... args) {
-        InvokeWithExceptionNode invoke = kit.startInvokeWithException(target, invokeKind, kit.getFrameState(), kit.bci(), args);
+        int bci = kit.bci();
+        InvokeWithExceptionNode invoke = kit.startInvokeWithException(target, invokeKind, kit.getFrameState(), bci, args);
+        invoke.setNodeSourcePosition(NodeSourcePosition.placeholder(kit.getGraph().method(), bci));
         kit.exceptionPart();
         ExceptionObjectNode exception = kit.exceptionObject();
 
