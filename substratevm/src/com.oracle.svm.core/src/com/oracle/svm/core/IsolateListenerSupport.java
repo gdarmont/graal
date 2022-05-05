@@ -62,10 +62,10 @@ public class IsolateListenerSupport {
         }
     }
 
-    @Uninterruptible(reason = "Thread state not yet set up.")
-    public void beforeIsolateTearDown() {
+    @Uninterruptible(reason = "The isolate teardown is in progress.")
+    public void onIsolateTeardown() {
         for (int i = 0; i < listeners.length; i++) {
-            listeners[i].beforeIsolateTearDown();
+            listeners[i].onIsolateTeardown();
         }
     }
 
@@ -73,7 +73,7 @@ public class IsolateListenerSupport {
         @Uninterruptible(reason = "Thread state not yet set up.")
         void afterCreateIsolate(Isolate isolate);
 
-        @Uninterruptible(reason = "Isolate teardown.")
-        void beforeIsolateTearDown();
+        @Uninterruptible(reason = "The isolate teardown is in progress.")
+        void onIsolateTeardown();
     }
 }

@@ -205,8 +205,8 @@ public abstract class SubstrateSegfaultHandler {
         }
 
         @Override
-        @Uninterruptible(reason = "Isolate teardown.")
-        public void beforeIsolateTearDown() {
+        @Uninterruptible(reason = "The isolate teardown is in progress.")
+        public void onIsolateTeardown() {
         }
 
         @Uninterruptible(reason = "Thread state not yet set up.")

@@ -43,7 +43,7 @@ import com.oracle.svm.core.jdk.UninterruptibleUtils;
  * already has the lock. Other spin lock implementations can deadlock in such a case. So it is
  * essential to check if the current thread is the owner of the lock, before acquiring it.
  */
-public class SamplerSpinLock {
+class SamplerSpinLock {
     private final UninterruptibleUtils.AtomicPointer<IsolateThread> owner;
 
     @Platforms(Platform.HOSTED_ONLY.class)

@@ -36,7 +36,6 @@ import com.oracle.svm.core.thread.ThreadListener;
 import com.oracle.svm.core.threadlocal.FastThreadLocalFactory;
 import com.oracle.svm.core.threadlocal.FastThreadLocalLong;
 import com.oracle.svm.core.threadlocal.FastThreadLocalWord;
-import com.oracle.svm.core.util.VMError;
 
 class SamplerThreadLocal implements ThreadListener {
 
@@ -58,24 +57,25 @@ class SamplerThreadLocal implements ThreadListener {
 
     @Uninterruptible(reason = "Called from uninterruptible code.", mayBeInlined = true)
     public static void initialize(IsolateThread isolateThread) {
-        /* Adjust the number of buffers. */
-        SamplerBufferPool.adjustBufferCount();
+        if (SamplerIsolateLocal.isKeySet()) {
+            /* Adjust the number of buffers. */
+            SamplerBufferPool.adjustBufferCount();
 
-        /*
-         * Save isolate thread in thread-local area.
-         * 
-         * Once this value is set, the signal handler may interrupt this thread at any time. So, it
-         * is essential that this value is set at the very end of this method.
-         */
-        UnsignedWord key = SamplerIsolateLocal.getKey();
-        VMError.guarantee(key.aboveThan(0));
-        SubstrateSigprofHandler.singleton().setThreadLocalKeyValue(key, isolateThread);
+            /*
+             * Save isolate thread in thread-local area.
+             *
+             * Once this value is set, the signal handler may interrupt this thread at any time. So,
+             * it is essential that this value is set at the very end of this method.
+             */
+            UnsignedWord key = SamplerIsolateLocal.getKey();
+            SubstrateSigprofHandler.singleton().setThreadLocalKeyValue(key, isolateThread);
+        }
     }
 
     @Override
     @Uninterruptible(reason = "Only uninterruptible code may be executed after Thread.exit.")
     public void afterThreadExit(IsolateThread isolateThread, Thread javaThread) {
-        if (SubstrateSigprofHandler.isProfilingEnabled()) {
+        if (SubstrateSigprofHandler.isProfilingEnabled() && SamplerIsolateLocal.isKeySet()) {
             /*
              * Invalidate thread-local area.
              *
@@ -84,7 +84,6 @@ class SamplerThreadLocal implements ThreadListener {
              * method i.e. before doing cleanup.
              */
             UnsignedWord key = SamplerIsolateLocal.getKey();
-            VMError.guarantee(key.aboveThan(0));
             SubstrateSigprofHandler.singleton().setThreadLocalKeyValue(key, WordFactory.nullPointer());
 
             /* Adjust the number of buffers (including the thread-local buffer). */

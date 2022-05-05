@@ -55,12 +55,12 @@ class SamplerIsolateLocal implements IsolateListenerSupport.IsolateListener {
     }
 
     @Override
-    @Uninterruptible(reason = "Isolate teardown.")
-    public void beforeIsolateTearDown() {
-        if (SubstrateSigprofHandler.isProfilingSupported()) {
-            if (isKeySet()) {
-                SubstrateSigprofHandler.singleton().deleteThreadLocalKey(key);
-            }
+    @Uninterruptible(reason = "The isolate teardown is in progress.")
+    public void onIsolateTeardown() {
+        if (SubstrateSigprofHandler.isProfilingSupported() && isKeySet()) {
+            UnsignedWord oldKey = key;
+            key = WordFactory.unsigned(0);
+            SubstrateSigprofHandler.singleton().deleteThreadLocalKey(oldKey);
         }
     }
 
@@ -76,6 +76,6 @@ class SamplerIsolateLocal implements IsolateListenerSupport.IsolateListener {
 
     @Uninterruptible(reason = "Called from uninterruptible code.", mayBeInlined = true)
     public static boolean isKeySet() {
-        return key.notEqual(0);
+        return key.aboveThan(0);
     }
 }

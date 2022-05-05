@@ -135,8 +135,8 @@ final class SubstrateSigprofHandlerStartupHook implements RuntimeSupport.Hook {
  * The communication between consumer and producer goes as follows:
  * <ul>
  * <li>Signal handler (producer): pops the buffer from the pool of available buffers (the buffer now
- * becomes thread-local), writes the IPs into buffer, if the buffer is full and moves it to a pool with
- * buffers that awaits processing.</li>
+ * becomes thread-local), writes the IPs into buffer, if the buffer is full and moves it to a pool
+ * with buffers that awaits processing.</li>
  * <li>Recorder thread (consumer): pops the buffer from the pool of full buffers, reconstructs the
  * stack walk based on IPs and pushes the buffer into pool of available buffers.</li>
  * </ul>
@@ -320,6 +320,11 @@ public abstract class SubstrateSigprofHandler {
     /** Called from the platform dependent sigprof handler to enter isolate. */
     @Uninterruptible(reason = "The method executes during signal handling.", callerMustBe = true)
     protected static void tryEnterIsolateAndDoWalk(RegisterDumper.Context uContext) {
+        if (!SamplerIsolateLocal.isKeySet()) {
+            /* The key is set for initial isolate only. */
+            return;
+        }
+
         Isolate isolate = SamplerIsolateLocal.getIsolate();
         if (isolate.isNull()) {
             /* It may happen that the initial isolate exited. */

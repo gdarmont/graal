@@ -463,7 +463,6 @@ public final class CEntryPointSnippets extends SubstrateTemplates implements Sni
     @SubstrateForeignCallTarget(stubCallingConvention = false)
     private static int tearDownIsolate() {
         try {
-            IsolateListenerSupport.singleton().beforeIsolateTearDown();
             RuntimeSupport.executeTearDownHooks();
             if (!PlatformThreads.singleton().tearDown()) {
                 return CEntryPointErrors.UNSPECIFIED;
