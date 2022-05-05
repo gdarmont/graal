@@ -56,7 +56,7 @@ class SamplerThreadLocal implements ThreadListener {
     }
 
     @Uninterruptible(reason = "Called from uninterruptible code.", mayBeInlined = true)
-    public static void initialize(IsolateThread isolateThread) {
+    static void initialize(IsolateThread isolateThread) {
         if (SamplerIsolateLocal.isKeySet()) {
             /* Adjust the number of buffers. */
             SamplerBufferPool.adjustBufferCount();
@@ -76,21 +76,26 @@ class SamplerThreadLocal implements ThreadListener {
     @Uninterruptible(reason = "Only uninterruptible code may be executed after Thread.exit.")
     public void afterThreadExit(IsolateThread isolateThread, Thread javaThread) {
         if (SubstrateSigprofHandler.isProfilingEnabled() && SamplerIsolateLocal.isKeySet()) {
-            /*
-             * Invalidate thread-local area.
-             *
-             * Once this value is set to null, the signal handler can't interrupt this thread
-             * anymore. So, it is essential that this value is set at the very beginning of this
-             * method i.e. before doing cleanup.
-             */
-            UnsignedWord key = SamplerIsolateLocal.getKey();
-            SubstrateSigprofHandler.singleton().setThreadLocalKeyValue(key, WordFactory.nullPointer());
-
-            /* Adjust the number of buffers (including the thread-local buffer). */
-            SamplerBuffer threadLocalBuffer = localBuffer.get(isolateThread);
-            SamplerBufferPool.adjustBufferCount(threadLocalBuffer);
-            localBuffer.set(isolateThread, WordFactory.nullPointer());
+            teardown(isolateThread);
         }
+    }
+
+    @Uninterruptible(reason = "Called from uninterruptible code.", mayBeInlined = true)
+    static void teardown(IsolateThread isolateThread) {
+        /*
+         * Invalidate thread-local area.
+         *
+         * Once this value is set to null, the signal handler can't interrupt this thread
+         * anymore. So, it is essential that this value is set at the very beginning of this
+         * method i.e. before doing cleanup.
+         */
+        UnsignedWord key = SamplerIsolateLocal.getKey();
+        SubstrateSigprofHandler.singleton().setThreadLocalKeyValue(key, WordFactory.nullPointer());
+
+        /* Adjust the number of buffers (including the thread-local buffer). */
+        SamplerBuffer threadLocalBuffer = localBuffer.get(isolateThread);
+        SamplerBufferPool.adjustBufferCount(threadLocalBuffer);
+        localBuffer.set(isolateThread, WordFactory.nullPointer());
     }
 
     @Uninterruptible(reason = "Called from uninterruptible code.", mayBeInlined = true)

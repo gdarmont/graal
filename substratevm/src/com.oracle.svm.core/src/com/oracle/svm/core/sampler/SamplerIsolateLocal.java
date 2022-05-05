@@ -25,6 +25,7 @@
 
 package com.oracle.svm.core.sampler;
 
+import org.graalvm.nativeimage.CurrentIsolate;
 import org.graalvm.nativeimage.Isolate;
 import org.graalvm.word.LocationIdentity;
 import org.graalvm.word.Pointer;
@@ -58,8 +59,14 @@ class SamplerIsolateLocal implements IsolateListenerSupport.IsolateListener {
     @Uninterruptible(reason = "The isolate teardown is in progress.")
     public void onIsolateTeardown() {
         if (SubstrateSigprofHandler.isProfilingSupported() && isKeySet()) {
+            /* Invalidate the isolate-specific key. */
             UnsignedWord oldKey = key;
             key = WordFactory.unsigned(0);
+
+            /* We need to manually call teardown because isKeySet will now return false. */
+            SamplerThreadLocal.teardown(CurrentIsolate.getCurrentThread());
+
+            /* Now, it's safe to delete the isolate-specific key. */
             SubstrateSigprofHandler.singleton().deleteThreadLocalKey(oldKey);
         }
     }
