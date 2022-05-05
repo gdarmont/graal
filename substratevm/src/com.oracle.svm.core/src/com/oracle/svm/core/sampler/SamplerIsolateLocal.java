@@ -58,7 +58,7 @@ class SamplerIsolateLocal implements IsolateListenerSupport.IsolateListener {
     @Override
     @Uninterruptible(reason = "The isolate teardown is in progress.")
     public void onIsolateTeardown() {
-        if (SubstrateSigprofHandler.isProfilingSupported() && isKeySet()) {
+        if (SubstrateSigprofHandler.isProfilingEnabled() && isKeySet()) {
             /* Invalidate the isolate-specific key. */
             UnsignedWord oldKey = key;
             key = WordFactory.unsigned(0);
